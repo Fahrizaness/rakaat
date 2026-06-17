@@ -1,0 +1,147 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@variant dark (.dark &);
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f1f5f9; /* Slate-100: Soft premium background for light mode */
+  color: #1e293b;            /* Slate-800: Softer text than pure black */
+  font-family: 'Outfit', 'Inter', sans-serif;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+html.dark, html.dark body, html.dark #root {
+  background-color: #0f172a; /* Dark Mode */
+  color: #f8fafc;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #e2e8f0;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f59e0b;
+}
+
+/* Glassmorphism styling */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85); /* Frosty white background */
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6); /* White border for soft edges */
+  box-shadow: 0 10px 30px 0 rgba(15, 23, 42, 0.035); /* Extremely soft shadow */
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dark .glass-panel {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.glass-panel-interactive {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 20px 0 rgba(15, 23, 42, 0.01);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-interactive:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(245, 158, 11, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px -10px rgba(15, 23, 42, 0.065);
+}
+
+.dark .glass-panel-interactive {
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+.dark .glass-panel-interactive:hover {
+  background: rgba(30, 41, 59, 0.75);
+  border-color: rgba(245, 158, 11, 0.25);
+  box-shadow: 0 12px 30px -10px rgba(245, 158, 11, 0.15);
+}
+
+/* Heatmap Tooltip Custom Styles */
+.heatmap-tooltip {
+  position: relative;
+}
+
+.heatmap-tooltip::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: #1e293b;
+  color: #f8fafc;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255,255,255,0.08);
+  z-index: 50;
+}
+
+.heatmap-tooltip:hover::before {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
+/* Pulsing streak effect (Light Mode: Red Flame) */
+.streak-fire {
+  color: #ef4444; /* red-500 */
+  filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.6));
+  animation: flame-red 1.5s infinite alternate ease-in-out;
+}
+
+/* Dark Mode: Amber/Gold Flame */
+html.dark .streak-fire {
+  color: #f59e0b; /* brand-500 */
+  filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.6));
+  animation: flame-gold 1.5s infinite alternate ease-in-out;
+}
+
+@keyframes flame-red {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(239, 68, 68, 0.4)); }
+  100% { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(239, 68, 68, 0.8)); }
+}
+
+@keyframes flame-gold {
+  0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.4)); }
+  100% { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.8)); }
+}

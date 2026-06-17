@@ -1,0 +1,1018 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import React, { useState } from 'react'
+import type { PrayerLog } from '../services/prayerService'
+import { 
+  Flame, 
+  TrendingUp, 
+  TrendingDown, 
+  CheckCircle2, 
+  Calendar,
+  Trophy,
+  Info,
+  CheckSquare,
+  BarChart3,
+  Settings,
+  User,
+  Cloud,
+  BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Sun,
+  Moon,
+  Monitor,
+  ShieldCheck,
+  Download,
+  X
+} from 'lucide-react'
+
+interface DashboardProps {
+  logs: PrayerLog[];
+  onTogglePrayer: (date: string, prayer: 'subuh' | 'dzuhur' | 'ashar' | 'maghrib' | 'isya') => void;
+  stats: {
+    currentStreak: number;
+    longestStreak: number;
+    monthlyCompletionRate: number;
+    totalChecked: number;
+    totalEligible: number;
+    comparisonGrowth: number;
+  };
+  user: any;
+  themeMode: 'light' | 'dark' | 'system';
+  onChangeThemeMode: (mode: 'light' | 'dark' | 'system') => void;
+  onUpdatePin: (pin: string) => Promise<{ success: boolean; message: string }>;
+  onUpdateProfileName: (name: string) => Promise<{ success: boolean; message: string }>;
+  showInstallPopup: boolean;
+  isIOS: boolean;
+  deferredPrompt: any;
+  onInstallPWA: () => Promise<void>;
+  onDismissInstall: () => void;
+}
+
+interface PrayerDoa {
+  id: string;
+  title: string;
+  arabic: string;
+  latin: string;
+  translation: string;
+  category: string;
+}
+
+const DAILY_DOAS: PrayerDoa[] = [
+  {
+    id: 'bangun-tidur',
+    category: 'Tidur & Bangun',
+    title: 'Doa Bangun Tidur',
+    arabic: 'اَلْحَمْدُ لِلَّهِ الَّذِيْ أَحْيَانَا بَعْدَ مَا أَمَاتَنَا وَإِلَيْهِ النُّشُوْرُ',
+    latin: 'Alhamdulillahil ladzi ahyana ba\'da ma amatana wa ilaihin nusyur.',
+    translation: 'Segala puji bagi Allah yang telah menghidupkan kami kembali setelah mematikan kami (tidur) dan hanya kepada-Nya kami kembali.'
+  },
+  {
+    id: 'sebelum-tidur',
+    category: 'Tidur & Bangun',
+    title: 'Doa Sebelum Tidur',
+    arabic: 'بِاسْمِكَ اللَّهُمَّ أَحْيَا وَأَمُوتُ',
+    latin: 'Bismika Allahumma ahya wa amut.',
+    translation: 'Dengan nama-Mu ya Allah aku hidup dan aku mati.'
+  },
+  {
+    id: 'orang-tua',
+    category: 'Keluarga',
+    title: 'Doa untuk Kedua Orang Tua',
+    arabic: 'رَبِّ اغْفِرْ لِيْ وَلِوَالِدَيَّ وَارْحَمْهُمَا كَمَا رَبَّيَانِيْ صَغِيْرًا',
+    latin: 'Rabbighfir li waliwalidayya warhamhuma kama rabbayani shaghira.',
+    translation: 'Ya Tuhanku, ampunilah aku dan kedua orang tuaku, dan kasihilah mereka keduanya sebagaimana mereka dipelihara mendidik aku di waktu kecil.'
+  },
+  {
+    id: 'sapu-jagad',
+    category: 'Kebaikan Umum',
+    title: 'Doa Sapu Jagad (Kebaikan Dunia Akhirat)',
+    arabic: 'رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ',
+    latin: 'Rabbana atina fid-dunya hasanatah, wa fil-akhirati hasanatah, wa qina \'adzaban-nar.',
+    translation: 'Ya Tuhan kami, berilah kami kebaikan di dunia dan kebaikan di akhirat, dan lindungilah kami dari azab neraka.'
+  },
+  {
+    id: 'setelah-adzan',
+    category: 'Sholat & Ibadah',
+    title: 'Doa Setelah Adzan',
+    arabic: 'اللَّهُمَّ رَبَّ هَذِهِ الدَّعْوَةِ التَّامَّةِ وَالصَّلَاةِ الْقَائِمَةِ آتِ مُحَمَّدًا الْوَسِيلَةَ وَالْفَضِيلَةَ وَابْعَثْهُ مَقَامًا مَحْمُودًا الَّذِي وَعَدْتَهُ',
+    latin: 'Allahumma rabba hadzihid da\'watit tammah, wash-shalatil qa\'imah, ati Muhammadanil wasilata wal fadhilah, wab\'atshu maqamam mahmudanil ladzi wa\'adtah.',
+    translation: 'Ya Allah, Tuhan pemilik seruan yang sempurna ini dan sholat yang tegak berdiri, berilah Nabi Muhammad wasilah (wasilah/tempat tinggi) dan keutamaan, dan bangkitkanlah beliau di tempat yang terpuji yang telah Engkau janjikan.'
+  },
+  {
+    id: 'pembuka-rezeki',
+    category: 'Rezeki & Keberkahan',
+    title: 'Doa Pembuka Pintu Rezeki (Doa Nabi Musa)',
+    arabic: 'رَبِّ إِنِّي لِمَا أَنْزَلْتَ إِلَيَّ مِنْ خَيْرٍ فَقِيرٌ',
+    latin: 'Rabbi inni lima anzalta ilayya min khairin faqir.',
+    translation: 'Ya Tuhanku, sesungguhnya aku sangat memerlukan sesuatu kebaikan (rezeki) yang Engkau turunkan kepadaku.'
+  }
+]
+
+const SHOLAT_QUOTES = [
+  "Sholat adalah tiang agama, barangsiapa mendirikannya maka ia mendirikan agama.",
+  "Amalan yang pertama kali dihisab pada hari kiamat adalah sholat wajib.",
+  "Jadikanlah sabar dan sholat sebagai penolongmu. Sesungguhnya Allah bersama orang yang sabar.",
+  "Sholat tepat waktu adalah amalan yang paling dicintai oleh Allah SWT.",
+  "Batas antara seorang muslim dengan kesyirikan dan kekafiran adalah meninggalkan sholat.",
+  "Sesungguhnya sholat itu mencegah dari perbuatan keji dan kemungkaran.",
+  "Sholatlah selagi kau bisa sholat, sebelum kau disholatkan.",
+  "Dua rakaat sholat Subuh lebih baik daripada dunia dan segala isinya.",
+  "Jagalah sholatmu, karena ketika kamu kehilangannya, kamu kehilangan segalanya.",
+  "Sholat lima waktu laksana sungai mengalir di depan pintu rumah yang membersihkan kotoran setiap hari."
+]
+
+export const Dashboard: React.FC<DashboardProps> = ({ 
+  logs, 
+  onTogglePrayer, 
+  stats,
+  user,
+  themeMode,
+  onChangeThemeMode,
+  onUpdatePin,
+  onUpdateProfileName,
+  showInstallPopup,
+  isIOS,
+  deferredPrompt,
+  onInstallPWA,
+  onDismissInstall
+}) => {
+  const [selectedDate, setSelectedDate] = useState(() => {
+    return new Date().toISOString().split('T')[0]
+  })
+  
+  const [activeTab, setActiveTab] = useState<'tracker' | 'stats' | 'doa' | 'settings'>('tracker')
+  const [doaSearch, setDoaSearch] = useState<string>('')
+  const [expandedDoaId, setExpandedDoaId] = useState<string | null>(null)
+
+  // PIN security states
+  const [pin, setPin] = useState('')
+  const [pinLoading, setPinLoading] = useState(false)
+  const [pinMessage, setPinMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  // Profile editing states
+  const [profileName, setProfileName] = useState(() => user?.user_metadata?.display_name || '')
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const handleSaveProfileName = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setProfileMessage(null)
+
+    if (!profileName.trim()) {
+      setProfileMessage({ type: 'error', text: 'Nama profil tidak boleh kosong.' })
+      return
+    }
+
+    setProfileLoading(true)
+    const res = await onUpdateProfileName(profileName.trim())
+    setProfileLoading(false)
+    
+    if (res.success) {
+      setProfileMessage({ type: 'success', text: res.message })
+    } else {
+      setProfileMessage({ type: 'error', text: res.message })
+    }
+  }
+
+  const handleSavePin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPinMessage(null)
+
+    if (pin.length !== 6 || !/^\d+$/.test(pin)) {
+      setPinMessage({ type: 'error', text: 'PIN harus berupa 6 digit angka.' })
+      return
+    }
+
+    setPinLoading(true)
+    const res = await onUpdatePin(pin)
+    setPinLoading(false)
+    
+    if (res.success) {
+      setPinMessage({ type: 'success', text: res.message })
+      setPin('')
+    } else {
+      setPinMessage({ type: 'error', text: res.message })
+    }
+  }
+
+  const getGreetingTime = () => {
+    const hour = new Date().getHours()
+    if (hour >= 5 && hour < 11) return 'Selamat Pagi,'
+    if (hour >= 11 && hour < 15) return 'Selamat Siang,'
+    if (hour >= 15 && hour < 18) return 'Selamat Sore,'
+    return 'Selamat Malam,'
+  }
+
+  const getDailyQuote = () => {
+    const day = new Date().getDate()
+    const index = day % SHOLAT_QUOTES.length
+    return SHOLAT_QUOTES[index]
+  }
+
+  // Format today's date in Indonesian
+  const getIndonesianDateString = (dateStr: string) => {
+    const d = new Date(dateStr)
+    const options: Intl.DateTimeFormatOptions = { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }
+    return d.toLocaleDateString('id-ID', options)
+  }
+
+  // Get current log for selected date
+  const currentLog = logs.find(l => l.date === selectedDate) || {
+    date: selectedDate,
+    subuh: false,
+    dzuhur: false,
+    ashar: false,
+    maghrib: false,
+    isya: false
+  }
+
+  const prayersList: { key: 'subuh' | 'dzuhur' | 'ashar' | 'maghrib' | 'isya'; label: string; time: string }[] = [
+    { key: 'subuh', label: 'Subuh', time: '04:45' },
+    { key: 'dzuhur', label: 'Dzuhur', time: '12:05' },
+    { key: 'ashar', label: 'Ashar', time: '15:25' },
+    { key: 'maghrib', label: 'Maghrib', time: '18:15' },
+    { key: 'isya', label: 'Isya', time: '19:30' }
+  ]
+
+  const totalPrayedToday = [
+    currentLog.subuh, 
+    currentLog.dzuhur, 
+    currentLog.ashar, 
+    currentLog.maghrib, 
+    currentLog.isya
+  ].filter(Boolean).length
+
+  const isToday = selectedDate === new Date().toISOString().split('T')[0]
+
+  // Generate 20 weeks of heatmap cells
+  const generateHeatmapData = () => {
+    const numWeeks = 20
+    const totalDays = numWeeks * 7
+    const result = []
+    
+    const today = new Date()
+    const currentDay = today.getDay()
+    
+    const start = new Date(today)
+    start.setDate(today.getDate() - totalDays + currentDay + 1)
+
+    for (let i = 0; i < totalDays; i++) {
+      const currentDate = new Date(start)
+      currentDate.setDate(start.getDate() + i)
+      const dateStr = currentDate.toISOString().split('T')[0]
+      
+      const log = logs.find(l => l.date === dateStr)
+      let count = 0
+      if (log) {
+        if (log.subuh) count++
+        if (log.dzuhur) count++
+        if (log.ashar) count++
+        if (log.maghrib) count++
+        if (log.isya) count++
+      }
+      
+      result.push({
+        date: dateStr,
+        count,
+        dayOfWeek: currentDate.getDay(),
+        formattedDate: currentDate.toLocaleDateString('id-ID', { month: 'short', day: 'numeric', weekday: 'short' })
+      })
+    }
+    return result
+  }
+
+  const heatmapCells = generateHeatmapData()
+
+  // Group cells by week
+  const heatmapWeeks: typeof heatmapCells[] = []
+  for (let i = 0; i < heatmapCells.length; i += 7) {
+    heatmapWeeks.push(heatmapCells.slice(i, i + 7))
+  }
+
+  // Get color scale class based on prayer count
+  const getHeatmapColorClass = (count: number) => {
+    switch (count) {
+      case 0: return 'bg-slate-200 dark:bg-slate-800 border-slate-300/60 dark:border-slate-900/40 hover:bg-slate-300 dark:hover:bg-slate-700'
+      case 1:
+      case 2: return 'bg-amber-500/20 dark:bg-amber-500/30 border-amber-500/10 dark:border-amber-500/20 text-amber-600 dark:text-amber-200 hover:bg-amber-500/30 dark:hover:bg-amber-500/40'
+      case 3:
+      case 4: return 'bg-emerald-500/20 dark:bg-emerald-600/50 border-emerald-550/10 dark:border-emerald-600/30 text-emerald-700 dark:text-emerald-100 hover:bg-emerald-500/30 dark:hover:bg-emerald-600/70'
+      case 5: return 'bg-emerald-500 border-emerald-400/25 dark:border-emerald-400/30 text-white hover:bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.2)]'
+      default: return 'bg-slate-200 dark:bg-slate-800'
+    }
+  }
+
+  // Month labels helper
+  const getMonthLabels = () => {
+    const labels: { text: string; colSpan: number }[] = []
+    let currentMonth = ''
+    let count = 0
+
+    heatmapWeeks.forEach((week, index) => {
+      const midDay = new Date(week[3].date)
+      const monthName = midDay.toLocaleDateString('id-ID', { month: 'short' })
+      
+      if (monthName !== currentMonth) {
+        if (count > 0) {
+          labels.push({ text: currentMonth, colSpan: count })
+        }
+        currentMonth = monthName
+        count = 1
+      } else {
+        count++
+      }
+
+      if (index === heatmapWeeks.length - 1) {
+        labels.push({ text: currentMonth, colSpan: count })
+      }
+    })
+
+    return labels
+  }
+
+  const monthLabels = getMonthLabels()
+
+  // Filtered daily prayers list
+  const filteredDoas = DAILY_DOAS.filter(doa => {
+    const query = doaSearch.toLowerCase()
+    return (
+      doa.title.toLowerCase().includes(query) ||
+      doa.translation.toLowerCase().includes(query) ||
+      doa.latin.toLowerCase().includes(query) ||
+      doa.category.toLowerCase().includes(query)
+    )
+  })
+
+  return (
+    <main className="max-w-6xl mx-auto px-4 py-8 space-y-6 flex-1 w-full pb-32 transition-colors duration-300">
+      
+      {/* Floating Bottom Navigation Bar (iOS / Mobile Tab Bar style - Sits directly at the bottom edge) */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-[#0f172a] border-t border-slate-200 dark:border-slate-800/80 shadow-[0_-4px_25px_rgba(15,23,42,0.03)] dark:shadow-[0_-8px_30px_rgba(0,0,0,0.2)] py-2.5 flex items-center justify-between px-6 pb-6 sm:pb-3.5 transition-all duration-300 after:absolute after:top-full after:left-0 after:right-0 after:h-12 after:bg-white dark:after:bg-[#0f172a]">
+        <button
+          onClick={() => {
+            setActiveTab('tracker')
+          }}
+          className={`flex flex-col items-center gap-1.5 py-1 rounded-xl transition-all duration-200 flex-1 cursor-pointer ${
+            activeTab === 'tracker'
+              ? 'text-emerald-600 dark:text-brand-400 font-bold scale-105'
+              : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'
+          }`}
+        >
+          <CheckSquare className="w-5.5 h-5.5 shrink-0" />
+          <span className="text-[10px] tracking-wide font-medium">Pelacak</span>
+        </button>
+        
+        <button
+          onClick={() => {
+            setActiveTab('stats')
+          }}
+          className={`flex flex-col items-center gap-1.5 py-1 rounded-xl transition-all duration-200 flex-1 cursor-pointer ${
+            activeTab === 'stats'
+              ? 'text-emerald-600 dark:text-brand-400 font-bold scale-105'
+              : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'
+          }`}
+        >
+          <BarChart3 className="w-5.5 h-5.5 shrink-0" />
+          <span className="text-[10px] tracking-wide font-medium">Statistik</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('doa')
+          }}
+          className={`flex flex-col items-center gap-1.5 py-1 rounded-xl transition-all duration-200 flex-1 cursor-pointer ${
+            activeTab === 'doa'
+              ? 'text-emerald-600 dark:text-brand-400 font-bold scale-105'
+              : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'
+          }`}
+        >
+          <BookOpen className="w-5.5 h-5.5 shrink-0" />
+          <span className="text-[10px] tracking-wide font-medium">Doa</span>
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveTab('settings')
+          }}
+          className={`flex flex-col items-center gap-1.5 py-1 rounded-xl transition-all duration-200 flex-1 cursor-pointer ${
+            activeTab === 'settings'
+              ? 'text-emerald-600 dark:text-brand-400 font-bold scale-105'
+              : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'
+          }`}
+        >
+          <Settings className="w-5.5 h-5.5 shrink-0" />
+          <span className="text-[10px] tracking-wide font-medium">Pengaturan</span>
+        </button>
+      </div>
+
+      {/* RENDER VIEW BERDASARKAN AKTIF TAB */}
+
+      {/* TAB 1: PELACAK */}
+      {activeTab === 'tracker' && (
+        <div className="space-y-6 max-w-xl mx-auto animate-fade-in">
+          
+          {/* PWA Install Banner (styled like user screenshot) */}
+          {showInstallPopup && (
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 flex items-center justify-between gap-4 shadow-sm animate-scale-in">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100/30 dark:border-emerald-900/30 flex items-center justify-center text-emerald-600 dark:text-brand-400 shrink-0">
+                  <Download className="w-4 h-4" />
+                </div>
+                <div className="text-left">
+                  <h4 className="font-bold text-slate-850 dark:text-white text-xs sm:text-sm leading-tight">
+                    Pasang Rakaat di HP Anda!
+                  </h4>
+                  {isIOS && (
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-semibold mt-0.5">
+                      Ketuk Bagikan &rarr; Tambahkan ke Layar Utama
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 shrink-0">
+                {!isIOS && deferredPrompt ? (
+                  <button
+                    onClick={onInstallPWA}
+                    className="bg-emerald-500 hover:bg-emerald-600 dark:bg-brand-500 dark:hover:bg-brand-600 text-slate-950 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 active:scale-95 cursor-pointer shadow-sm"
+                  >
+                    Pasang
+                  </button>
+                ) : isIOS ? (
+                  <span className="text-[9px] bg-slate-100 dark:bg-slate-800 text-slate-650 dark:text-slate-350 font-bold px-2 py-1 rounded-md border border-slate-200/50 dark:border-slate-700">
+                    iOS Safari
+                  </span>
+                ) : (
+                  <span className="text-[9px] text-slate-450 dark:text-slate-500 font-medium">
+                    Tersedia
+                  </span>
+                )}
+                <button
+                  onClick={onDismissInstall}
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Tutup"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Welcome Greeting Header */}
+          <div className="space-y-1 mt-2 mb-1 pl-1">
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-none block">
+              {getGreetingTime()}
+            </span>
+            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
+              {user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Pengguna Rakaat'}
+            </h2>
+            <p className="text-[11px] sm:text-xs text-emerald-600 dark:text-brand-400 italic font-medium leading-relaxed max-w-md mt-1.5 opacity-90">
+              &ldquo;{getDailyQuote()}&rdquo;
+            </p>
+          </div>
+
+          {/* Maa Shaa Allah Banner */}
+          {totalPrayedToday === 5 && isToday && (
+            <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-950/40 dark:to-teal-950/40 border border-emerald-200/60 dark:border-emerald-500/30 shadow-lg shadow-emerald-500/5 flex items-center justify-between gap-4 animate-scale-in">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <Trophy className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-emerald-900 dark:text-white text-xs sm:text-sm">Maa Shaa Allah!</h3>
+                  <p className="text-emerald-800 dark:text-slate-400 text-[10px] sm:text-xs">Semua sholat hari ini telah diselesaikan. Pertahankan kebiasaan baik ini!</p>
+                </div>
+              </div>
+              <div className="px-2.5 py-1 rounded-full bg-emerald-500 text-slate-950 text-[10px] font-bold shrink-0">
+                Sempurna 5/5
+              </div>
+            </div>
+          )}
+
+          {/* Mini Streak Summary */}
+          <div className="flex items-center justify-between p-4 bg-white dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl transition-colors duration-300 shadow-[0_4px_20px_rgba(15,23,42,0.015)]">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 streak-fire" />
+              <span className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Streak: <strong className="text-slate-900 dark:text-white">{stats.currentStreak} Hari</strong>
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-450 dark:text-slate-500 font-medium">Rekor Terbaik: {stats.longestStreak} Hari</span>
+          </div>
+
+          {/* Daily Tracker Checklist */}
+          <section className="glass-panel rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden transition-colors duration-300">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 dark:bg-brand-500/5 rounded-full blur-2xl -z-10" />
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
+              <div>
+                <span className="text-[10px] text-emerald-600 dark:text-brand-400 font-bold uppercase tracking-widest">
+                  Pelacak Sholat Harian
+                </span>
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-slate-100 mt-0.5">
+                  {getIndonesianDateString(selectedDate)}
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300 rounded-lg px-2.5 py-1 focus:border-emerald-500 dark:focus:border-brand-500 outline-none cursor-pointer shadow-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {prayersList.map((prayer) => {
+                const checked = !!currentLog[prayer.key]
+                return (
+                  <button
+                    key={prayer.key}
+                    onClick={() => onTogglePrayer(selectedDate, prayer.key)}
+                    className={`w-full p-4 rounded-xl flex items-center justify-between transition-all duration-300 border text-left group cursor-pointer ${
+                      checked
+                        ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200 shadow-sm shadow-emerald-500/5'
+                        : 'bg-white dark:bg-slate-900/40 border-slate-200/60 dark:border-slate-850/80 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-900/80'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${
+                        checked
+                          ? 'bg-emerald-500 text-slate-950 scale-100'
+                          : 'border-2 border-slate-300 dark:border-slate-700 group-hover:border-slate-450 dark:group-hover:border-slate-500 scale-95'
+                      }`}>
+                        {checked && <CheckCircle2 className="w-3.5 h-3.5 stroke-[3px]" />}
+                      </div>
+                      <div>
+                        <span className={`text-sm font-bold transition-colors ${checked ? 'text-emerald-900 dark:text-white' : 'text-slate-700 dark:text-slate-300'}`}>
+                          {prayer.label}
+                        </span>
+                        <span className="text-[10px] text-slate-450 dark:text-slate-500 ml-1.5">({prayer.time})</span>
+                      </div>
+                    </div>
+
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      checked
+                        ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-450'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500'
+                    }`}>
+                      {checked ? 'Sudah' : 'Belum'}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* TAB 2: STATISTIK */}
+      {activeTab === 'stats' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Baris Atas: Streak & Konsistensi */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Streak Panel */}
+            <section className="glass-panel rounded-3xl p-6 sm:p-8 flex flex-col justify-between min-h-[150px] relative overflow-hidden transition-colors duration-300">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/5 dark:bg-amber-500/5 rounded-full blur-3xl -z-10" />
+              <div className="flex items-start justify-between">
+                <div>
+                  <span className="text-[10px] text-rose-600 dark:text-brand-400 font-bold uppercase tracking-widest">
+                    Streak Saat Ini
+                  </span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 dark:bg-amber-500/5 flex items-center justify-center">
+                      <Flame className="w-5 h-5 streak-fire" />
+                    </div>
+                    <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                      {stats.currentStreak} <span className="text-sm font-medium text-slate-500 dark:text-slate-450">Hari</span>
+                    </h3>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-[9px] text-slate-500 dark:text-slate-500 font-semibold uppercase tracking-wider block">
+                    Terbaik
+                  </span>
+                  <span className="text-xs font-bold text-rose-600 dark:text-amber-500 block mt-0.5">
+                    🔥 {stats.longestStreak} Hari
+                  </span>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-650 dark:text-slate-400 mt-4 leading-relaxed bg-white/50 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200/60 dark:border-slate-800/80">
+                <span className="font-semibold text-slate-700 dark:text-slate-350">Definisi Streak:</span> Semua 5 sholat harian wajib diselesaikan penuh dalam satu hari kalender.
+              </p>
+            </section>
+
+            {/* Monthly Consistency */}
+            <section className="glass-panel rounded-3xl p-6 sm:p-8 space-y-4 relative overflow-hidden transition-colors duration-300">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl -z-10" />
+              <div>
+                <span className="text-[10px] text-emerald-600 dark:text-brand-400 font-bold uppercase tracking-widest">
+                  Konsistensi Bulan Ini
+                </span>
+                <div className="flex items-baseline gap-2 mt-1">
+                  <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                    {stats.monthlyCompletionRate}%
+                  </h3>
+                  <span className="text-[10px] text-slate-500 dark:text-slate-450 font-medium">dari target 100%</span>
+                </div>
+              </div>
+
+              {/* Glowing progress bar */}
+              <div className="space-y-2">
+                <div className="w-full h-2.5 bg-slate-200 dark:bg-slate-950 rounded-full overflow-hidden border border-slate-250 dark:border-slate-850/80 relative">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, stats.monthlyCompletionRate)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-650 dark:text-slate-400">
+                  <span>Total: <strong className="text-slate-800 dark:text-slate-200">{stats.totalChecked}</strong> dari {stats.totalEligible} sholat</span>
+                  <span>Target: 5 Waktu / Hari</span>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {/* Heatmap Grid Panel */}
+          <section className="glass-panel rounded-3xl p-6 sm:p-8 space-y-4 transition-colors duration-300">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-emerald-600 dark:text-brand-400" />
+                <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                  Heatmap Keistiqomahan (20 Minggu Terakhir)
+                </h3>
+              </div>
+              <div className="flex items-center gap-1.5 text-[9px] text-slate-500 dark:text-slate-455 self-start sm:self-center">
+                <span>Bolong</span>
+                <div className="w-2.5 h-2.5 rounded-sm bg-slate-200 dark:bg-slate-800" />
+                <div className="w-2.5 h-2.5 rounded-sm bg-amber-500/20 dark:bg-amber-500/30" />
+                <div className="w-2.5 h-2.5 rounded-sm bg-emerald-500/20 dark:bg-emerald-600/50" />
+                <div className="w-2.5 h-2.5 rounded-sm bg-emerald-50 shadow-[0_0_4px_rgba(16,185,129,0.2)]" />
+                <span>5 Waktu</span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto pb-2 -mx-2 px-2 scrollbar-thin">
+              <div className="min-w-[580px] grid grid-flow-col auto-cols-max gap-1">
+                {/* Days labels */}
+                <div className="grid grid-rows-7 gap-1 text-[8px] text-slate-550 dark:text-slate-500 font-semibold pr-2 select-none">
+                  <span className="h-3.5 flex items-center">Ahad</span>
+                  <span className="h-3.5 flex items-center">Sen</span>
+                  <span className="h-3.5 flex items-center">Sel</span>
+                  <span className="h-3.5 flex items-center">Rab</span>
+                  <span className="h-3.5 flex items-center">Kam</span>
+                  <span className="h-3.5 flex items-center">Jum</span>
+                  <span className="h-3.5 flex items-center">Sab</span>
+                </div>
+
+                {/* Weeks */}
+                {heatmapWeeks.map((week, wIdx) => (
+                  <div key={wIdx} className="grid grid-rows-7 gap-1">
+                    {week.map((cell) => (
+                      <button
+                        key={cell.date}
+                        onClick={() => {
+                          setSelectedDate(cell.date)
+                          setActiveTab('tracker')
+                        }}
+                        className={`w-3.5 h-3.5 rounded-[3px] border transition-all duration-150 heatmap-tooltip cursor-pointer ${getHeatmapColorClass(cell.count)} ${
+                          selectedDate === cell.date ? 'ring-2 ring-emerald-500 dark:ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-slate-950 scale-110' : 'border-slate-300/40 dark:border-transparent'
+                        }`}
+                        data-tooltip={`${cell.formattedDate}: ${cell.count} sholat`}
+                        aria-label={`Sholat ${cell.date}: ${cell.count} dari 5`}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+
+              {/* Month labels at bottom */}
+              <div className="min-w-[580px] pl-[34px] flex mt-1.5 text-[8px] text-slate-550 dark:text-slate-500 font-semibold tracking-wider select-none uppercase">
+                {monthLabels.map((label, idx) => (
+                  <div
+                    key={idx}
+                    style={{ width: `${label.colSpan * 18}px` }}
+                    className="truncate"
+                  >
+                    {label.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Progress Comparison */}
+          <section className="glass-panel rounded-3xl p-6 sm:p-8 relative overflow-hidden transition-colors duration-300">
+            <div className="absolute top-0 left-0 w-32 h-32 bg-emerald-500/5 dark:bg-brand-500/5 rounded-full blur-3xl -z-10" />
+            
+            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 mb-5">
+              <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-brand-400" />
+              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                Perbandingan Progres & Tren
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white/50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 rounded-xl p-4 flex flex-col justify-between transition-colors shadow-sm">
+                <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">Bulan Lalu</span>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <h4 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+                    {Math.round(stats.monthlyCompletionRate - stats.comparisonGrowth)}%
+                  </h4>
+                  <span className="text-[9px] text-slate-450 dark:text-slate-500">konsistensi</span>
+                </div>
+              </div>
+
+              <div className="bg-white/50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 rounded-xl p-4 flex flex-col justify-between relative overflow-hidden transition-colors shadow-sm">
+                <span className="text-[10px] font-semibold text-slate-550 dark:text-slate-400">Bulan Ini</span>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <h4 className="text-xl font-bold text-slate-950 dark:text-white">
+                    {stats.monthlyCompletionRate}%
+                  </h4>
+                  <span className="text-[9px] text-emerald-600 dark:text-brand-400 font-semibold">Terkini</span>
+                </div>
+              </div>
+
+              <div className={`border rounded-xl p-4 flex flex-col justify-between transition-colors shadow-sm ${
+                stats.comparisonGrowth >= 0 
+                  ? 'bg-emerald-50 dark:bg-emerald-950/10 border-emerald-200 dark:border-emerald-900/30 text-emerald-850 dark:text-emerald-300' 
+                  : 'bg-rose-50 dark:bg-rose-950/10 border-rose-200 dark:border-rose-900/30 text-rose-850 dark:text-rose-300'
+              }`}>
+                <span className="text-[10px] font-semibold">Tren Pertumbuhan</span>
+                <div className="mt-1 flex items-center gap-2">
+                  <h4 className="text-2xl font-extrabold tracking-tight">
+                    {stats.comparisonGrowth >= 0 ? `+${stats.comparisonGrowth}%` : `${stats.comparisonGrowth}%`}
+                  </h4>
+                  {stats.comparisonGrowth >= 0 ? (
+                    <div className="w-6 h-6 rounded-full bg-emerald-500/20 dark:bg-emerald-500/20 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-rose-500/20 dark:bg-rose-500/20 flex items-center justify-center text-rose-700 dark:text-rose-400 shrink-0">
+                      <TrendingDown className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* TAB 3: DOA-DOA HARIAN */}
+      {activeTab === 'doa' && (
+        <div className="space-y-6 max-w-2xl mx-auto animate-fade-in">
+          {/* Search Box */}
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Cari doa harian..."
+              value={doaSearch}
+              onChange={(e) => setDoaSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 dark:focus:border-brand-500 rounded-xl text-xs sm:text-sm text-slate-850 dark:text-white placeholder-slate-400 outline-none transition-all duration-300 shadow-sm"
+            />
+          </div>
+
+          {/* Doa Cards List */}
+          <div className="space-y-3.5">
+            {filteredDoas.length > 0 ? (
+              filteredDoas.map((doa) => {
+                const isExpanded = expandedDoaId === doa.id
+                return (
+                  <div 
+                    key={doa.id}
+                    className="glass-panel rounded-2xl overflow-hidden transition-all duration-300 border border-slate-200 dark:border-slate-800/80"
+                  >
+                    <button
+                      onClick={() => setExpandedDoaId(isExpanded ? null : doa.id)}
+                      className="w-full px-5 py-4 flex items-center justify-between text-left cursor-pointer hover:bg-slate-100/30 dark:hover:bg-slate-900/30 transition-colors"
+                    >
+                      <div>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-brand-400 text-[9px] font-bold uppercase tracking-wider">
+                          {doa.category}
+                        </span>
+                        <h4 className="font-bold text-slate-850 dark:text-slate-100 text-sm sm:text-base mt-1.5">
+                          {doa.title}
+                        </h4>
+                      </div>
+                      <div className="text-slate-400 shrink-0">
+                        {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-5 pb-5 pt-2 border-t border-slate-200 dark:border-slate-800/60 bg-white/30 dark:bg-slate-950/20 space-y-4 animate-scale-in">
+                        {/* Arab */}
+                        <div className="text-right py-4 font-serif text-slate-900 dark:text-white text-xl sm:text-2xl leading-loose font-bold tracking-wide select-all">
+                          {doa.arabic}
+                        </div>
+                        {/* Latin */}
+                        <div className="text-xs sm:text-sm text-emerald-700 dark:text-brand-350 italic pl-3 border-l-2 border-emerald-500 dark:border-brand-500 font-medium select-all">
+                          {doa.latin}
+                        </div>
+                        {/* Translation */}
+                        <div className="space-y-1 select-all">
+                          <span className="text-[9px] font-bold text-slate-450 dark:text-slate-500 uppercase tracking-widest block">Artinya:</span>
+                          <p className="text-xs sm:text-sm text-slate-650 dark:text-slate-350 leading-relaxed">
+                            "{doa.translation}"
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            ) : (
+              <div className="text-center py-12 text-slate-550 text-xs">
+                Tidak ada doa yang cocok dengan pencarian Anda.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 4: PENGATURAN */}
+      {activeTab === 'settings' && (
+        <section className="space-y-6 max-w-xl mx-auto animate-fade-in">
+          {/* Card Profil Pengguna */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 space-y-4 transition-colors duration-300">
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 text-sm sm:text-base border-b border-slate-200 dark:border-slate-800 pb-2.5">
+              <User className="w-4.5 h-4.5 text-emerald-600 dark:text-brand-400" />
+              <span>Profil Pengguna</span>
+            </h3>
+
+            {profileMessage && (
+              <div className={`p-3.5 rounded-xl text-xs border ${
+                profileMessage.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-850 dark:text-emerald-300'
+                  : 'bg-rose-500/10 border-rose-500/20 text-rose-850 dark:text-rose-300'
+              }`}>
+                {profileMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveProfileName} className="space-y-4 pt-1">
+              <div className="space-y-1.5">
+                <label htmlFor="profile-name" className="block text-[10px] font-bold text-slate-500 uppercase">Nama Profil</label>
+                <input
+                  type="text"
+                  id="profile-name"
+                  placeholder="Masukkan nama Anda..."
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-105 dark:bg-slate-950 border border-slate-250 dark:border-slate-850 rounded-xl text-xs outline-none focus:border-emerald-500 dark:focus:border-brand-500 text-slate-900 dark:text-white"
+                  required
+                />
+              </div>
+
+              <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-250">
+                <Cloud className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                <div className="text-[11px] leading-relaxed">
+                  <strong className="block mb-0.5 text-slate-850 dark:text-white">Sinkronisasi Database Aktif</strong>
+                  Seluruh log ibadah Anda telah tersinkronisasi dan dicadangkan secara aman di cloud Supabase untuk email <strong>{user?.email}</strong>.
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={profileLoading}
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 dark:bg-brand-500 dark:hover:bg-brand-600 text-slate-950 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 shadow-md shadow-emerald-500/10 dark:shadow-brand-500/10 cursor-pointer"
+              >
+                {profileLoading ? 'Menyimpan...' : 'Simpan Nama Profil'}
+              </button>
+            </form>
+          </div>
+
+          {/* Card PIN Keamanan */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 space-y-4 transition-colors duration-300 animate-fade-in">
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 text-sm sm:text-base border-b border-slate-200 dark:border-slate-800 pb-2.5">
+              <ShieldCheck className="w-4.5 h-4.5 text-emerald-600 dark:text-brand-400" />
+              <span>PIN Keamanan</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-405 leading-relaxed">
+              Atur 6 digit PIN numerik untuk masuk secara cepat tanpa menggunakan Magic Link email di masa mendatang.
+            </p>
+
+            {pinMessage && (
+              <div className={`p-3.5 rounded-xl text-xs border ${
+                pinMessage.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300'
+                  : 'bg-rose-500/10 border-rose-500/20 text-rose-800 dark:text-rose-300'
+              }`}>
+                {pinMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleSavePin} className="space-y-4 pt-1 max-w-sm">
+              <div className="space-y-1.5">
+                <label htmlFor="settings-pin" className="block text-[10px] font-bold text-slate-500 uppercase">PIN Baru (6 Digit Angka)</label>
+                <input
+                  type="password"
+                  id="settings-pin"
+                  placeholder="••••••"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  pattern="[0-9]*"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="w-full px-3.5 py-2.5 bg-slate-105 dark:bg-slate-950 border border-slate-250 dark:border-slate-850 rounded-xl text-xs outline-none focus:border-emerald-500 dark:focus:border-brand-500 tracking-widest"
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={pinLoading}
+                className="w-full py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 dark:bg-brand-500 dark:hover:bg-brand-600 text-slate-950 font-bold text-xs transition-all duration-200 flex items-center justify-center gap-1.5 active:scale-95 shadow-md shadow-emerald-500/10 dark:shadow-brand-500/10 cursor-pointer"
+              >
+                {pinLoading ? 'Menyimpan...' : 'Simpan PIN Keamanan'}
+              </button>
+            </form>
+          </div>
+
+          {/* Card Pengaturan Tema Tampilan */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 space-y-4 transition-colors duration-300">
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 text-sm sm:text-base border-b border-slate-200 dark:border-slate-800 pb-2.5">
+              <Sun className="w-4.5 h-4.5 text-emerald-600 dark:text-brand-400" />
+              <span>Tema Tampilan</span>
+            </h3>
+            <p className="text-[11px] text-slate-500 dark:text-slate-405">
+              Pilih tema warna aplikasi atau sesuaikan secara otomatis dengan pengaturan sistem perangkat Anda.
+            </p>
+            
+            {/* Segmented Control */}
+            <div className="grid grid-cols-3 gap-2 p-1 bg-slate-105 dark:bg-slate-950 border border-slate-250 dark:border-slate-850 rounded-xl">
+              <button
+                onClick={() => onChangeThemeMode('light')}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  themeMode === 'light'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-700'
+                    : 'text-slate-500 dark:text-slate-450 hover:text-slate-850 dark:hover:text-slate-250'
+                }`}
+              >
+                <Sun className="w-3.5 h-3.5" />
+                <span>Terang</span>
+              </button>
+              <button
+                onClick={() => onChangeThemeMode('dark')}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  themeMode === 'dark'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-700'
+                    : 'text-slate-500 dark:text-slate-455 hover:text-slate-850 dark:hover:text-slate-250'
+                }`}
+              >
+                <Moon className="w-3.5 h-3.5" />
+                <span>Gelap</span>
+              </button>
+              <button
+                onClick={() => onChangeThemeMode('system')}
+                className={`py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+                  themeMode === 'system'
+                    ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-200/50 dark:border-slate-700'
+                    : 'text-slate-500 dark:text-slate-450 hover:text-slate-850 dark:hover:text-slate-250'
+                }`}
+              >
+                <Monitor className="w-3.5 h-3.5" />
+                <span>Sistem</span>
+              </button>
+            </div>
+          </div>
+
+
+          {/* Card Tentang Aplikasi */}
+          <div className="glass-panel rounded-3xl p-6 sm:p-8 space-y-4 transition-colors duration-300">
+            <h3 className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 text-sm sm:text-base border-b border-slate-200 dark:border-slate-800 pb-2.5">
+              <Info className="w-4.5 h-4.5 text-emerald-600 dark:text-brand-400" />
+              <span>Tentang Rakaat</span>
+            </h3>
+            <div className="space-y-3 text-[11px] text-slate-550 dark:text-slate-405 leading-relaxed">
+              <p>
+                <strong>Rakaat</strong> adalah jurnal pelacak ibadah pribadi yang dirancang untuk membantu Anda memahami dan menumbuhkan konsistensi sholat wajib secara privat.
+              </p>
+              <p className="italic border-l-2 border-emerald-500 dark:border-brand-500 pl-3 py-1 my-3 text-slate-800 dark:text-slate-300 bg-slate-100 dark:bg-slate-900/30">
+                "Lihat perjalanan istiqomahmu, satu rakaat demi satu rakaat."
+              </p>
+              <p>
+                Versi: 1.0.0 (MVP) <br />
+                Teknologi: React, Tailwind CSS, Vite PWA, Supabase Database
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Quote Refleksi */}
+      <footer className="text-center py-6 text-slate-500 text-xs">
+        <p className="italic">"Lihat perjalanan istiqomahmu, satu rakaat demi satu rakaat."</p>
+        <p className="mt-1.5 text-[10px]">Rakaat &copy; {new Date().getFullYear()} &mdash; Pelacak Refleksi Pribadi</p>
+      </footer>
+    </main>
+  )
+}
