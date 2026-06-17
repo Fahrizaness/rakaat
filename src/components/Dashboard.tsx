@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState } from 'react'
 import type { PrayerLog } from '../services/prayerService'
+import { getJakartaDateString } from '../services/prayerService'
 import { 
   Flame, 
   TrendingUp, 
@@ -36,6 +37,13 @@ interface DashboardProps {
     totalChecked: number;
     totalEligible: number;
     comparisonGrowth: number;
+    prayerConsistency: {
+      subuh: number;
+      dzuhur: number;
+      ashar: number;
+      maghrib: number;
+      isya: number;
+    };
   };
   user: any;
   themeMode: 'light' | 'dark' | 'system';
@@ -122,6 +130,107 @@ const SHOLAT_QUOTES = [
   "Sholat lima waktu laksana sungai mengalir di depan pintu rumah yang membersihkan kotoran setiap hari."
 ]
 
+interface DailyDoa {
+  arabic: string;
+  latin: string;
+  translation: string;
+  source?: string;
+}
+
+const SHORT_DOAS: DailyDoa[] = [
+  {
+    arabic: "رَبِّ زِدْنِي عِلْمًا",
+    latin: "Rabbi zidni 'ilma",
+    translation: "Ya Tuhanku, tambahkanlah ilmu kepadaku.",
+    source: "QS. Taha: 114"
+  },
+  {
+    arabic: "اللَّهُمَّ إِنِّي أَسْأَلُكَ عِلْمًا نَافِعًا وَرِزْقًا طَيِّبًا وَعَمَلًا مُتَقَبَّلًا",
+    latin: "Allahumma inni as'aluka 'ilman nafi'an, wa rizqan tayyiban, wa 'amalan mutaqabbalan",
+    translation: "Ya Allah, aku memohon kepada-Mu ilmu yang bermanfaat, rezeki yang baik, dan amal yang diterima.",
+    source: "HR. Ibnu Majah"
+  },
+  {
+    arabic: "رَبِّ اغْفِرْ لِي وَلِوَالِدَيَّ",
+    latin: "Rabbighfir li waliwalidayya",
+    translation: "Ya Tuhanku, ampunilah aku dan kedua orang tuaku.",
+    source: "QS. Nuh: 28"
+  },
+  {
+    arabic: "يَا مُقَلِّبَ الْقُلُوبِ ثَبِّتْ قَلْبِي عَلَى دِينِكَ",
+    latin: "Ya Muqallibal quluub, tsabbit qalbi 'ala diinik",
+    translation: "Wahai Dzat yang membolak-balikkan hati, teguhkanlah hatiku di atas agama-Mu.",
+    source: "HR. Tirmidzi"
+  },
+  {
+    arabic: "رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الْآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ",
+    latin: "Rabbana atina fid-dunya hasanah, wa fil-akhirati hasanah, wa qina 'adzaban-nar",
+    translation: "Ya Tuhan kami, berilah kami kebaikan di dunia dan kebaikan di akhirat, dan lindungilah kami dari azab neraka.",
+    source: "QS. Al-Baqarah: 201"
+  },
+  {
+    arabic: "اللَّهُمَّ أَعِنِّي عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ",
+    latin: "Allahumma a'inni 'ala dzikrika wa syukrika wa husni 'ibadatik",
+    translation: "Ya Allah, tolonglah aku untuk selalu mengingat-Mu, bersyukur kepada-Mu, dan beribadah dengan baik kepada-Mu.",
+    source: "HR. Abu Dawud"
+  },
+  {
+    arabic: "رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي",
+    latin: "Rabbi-syrahli sadri, wa yassirli amri",
+    translation: "Ya Tuhanku, lapangkanlah dadaku, dan mudahkanlah urusanku.",
+    source: "QS. Taha: 25-26"
+  },
+  {
+    arabic: "اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي",
+    latin: "Allahumma innaka 'afuwwun tuhibbul 'afwa fa'fu 'anni",
+    translation: "Ya Allah, sesungguhnya Engkau Maha Pemaaf dan menyukai kemaafan, maka maafkanlah aku.",
+    source: "HR. Tirmidzi"
+  },
+  {
+    arabic: "رَبِّ هَبْ لِي مِنَ الصَّالِحِينَ",
+    latin: "Rabbi hab li minas-shalihin",
+    translation: "Ya Tuhanku, anugerahkanlah kepadaku (seorang anak) yang termasuk orang-orang yang saleh.",
+    source: "QS. As-Saffat: 100"
+  },
+  {
+    arabic: "حَسْبُنَا اللَّهُ وَنِعْمَ الْوَكِيلُ",
+    latin: "Hasbunallahu wa ni'mal wakil",
+    translation: "Cukuplah Allah bagi kami dan Dia adalah sebaik-baik pelindung.",
+    source: "QS. Ali 'Imran: 173"
+  },
+  {
+    arabic: "رَبِّ أَوْزِعْنِي أَنْ أَشْكُرَ نِعْمَتَكَ",
+    latin: "Rabbi awzi'ni an asykura ni'matak",
+    translation: "Ya Tuhanku, berilah aku ilham untuk tetap mensyukuri nikmat-Mu.",
+    source: "QS. An-Naml: 19"
+  },
+  {
+    arabic: "اللَّهُمَّ إِنِّي أَسْأَلُكَ الْهُدَى وَالتُّقَى وَالْعَفَافَ وَالْغِنَى",
+    latin: "Allahumma inni as'alukal-huda wat-tuqa wal-'afafa wal-ghina",
+    translation: "Ya Allah, aku memohon kepada-Mu petunjuk, ketakwaan, kesucian diri, dan kecukupan.",
+    source: "HR. Muslim"
+  },
+  {
+    arabic: "رَبَّنَا تَقَبَّلْ مِنَّا إِنَّكَ أَنْتَ السَّمِيعُ الْعَلِيمُ",
+    latin: "Rabbana taqabbal minna innaka Antas-Sami'ul-'Alim",
+    translation: "Ya Tuhan kami, terimalah dari kami (amalan kami), sesungguhnya Engkaulah Yang Maha Mendengar lagi Maha Mengetahui.",
+    source: "QS. Al-Baqarah: 127"
+  },
+  {
+    arabic: "رَبَّنَا لَا تُزِغْ قُلُوبَنَا بَعْدَ إِذْ هَدَيْتَنَا",
+    latin: "Rabbana la tuzigh quluubana ba'da idz hadaitana",
+    translation: "Ya Tuhan kami, janganlah Engkau jadikan hati kami condong kepada kesesatan sesudah Engkau beri petunjuk kepada kami.",
+    source: "QS. Ali 'Imran: 8"
+  },
+  {
+    arabic: "لَا إِلَهَ إِلَّا أَنْتَ سُبْحَاَنَكَ إِنِّي كُنْتُ مِنَ الظَّالِمِينَ",
+    latin: "La ilaha illa Anta subhanaka inni kuntu minaz-zhalimin",
+    translation: "Tidak ada Tuhan selain Engkau. Maha Suci Engkau, sesungguhnya aku adalah termasuk orang-orang yang zalim.",
+    source: "QS. Al-Anbiya: 87"
+  }
+]
+
+
 export const Dashboard: React.FC<DashboardProps> = ({ 
   logs, 
   onTogglePrayer, 
@@ -138,7 +247,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onDismissInstall
 }) => {
   const [selectedDate, setSelectedDate] = useState(() => {
-    return new Date().toISOString().split('T')[0]
+    return getJakartaDateString()
   })
   
   const [activeTab, setActiveTab] = useState<'tracker' | 'stats' | 'doa' | 'settings'>('tracker')
@@ -212,14 +321,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // Format today's date in Indonesian
   const getIndonesianDateString = (dateStr: string) => {
-    const d = new Date(dateStr)
+    const [y, m, d] = dateStr.split('-').map(Number)
+    const dateObj = new Date(y, m - 1, d)
     const options: Intl.DateTimeFormatOptions = { 
       weekday: 'long', 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
     }
-    return d.toLocaleDateString('id-ID', options)
+    return dateObj.toLocaleDateString('id-ID', options)
   }
 
   // Get current log for selected date
@@ -248,7 +358,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     currentLog.isya
   ].filter(Boolean).length
 
-  const isToday = selectedDate === new Date().toISOString().split('T')[0]
+  const isToday = selectedDate === getJakartaDateString()
 
   // Generate 20 weeks of heatmap cells
   const generateHeatmapData = () => {
@@ -256,7 +366,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const totalDays = numWeeks * 7
     const result = []
     
-    const today = new Date()
+    const jakartaTodayStr = getJakartaDateString()
+    const [y, m, d] = jakartaTodayStr.split('-').map(Number)
+    const today = new Date(y, m - 1, d)
     const currentDay = today.getDay()
     
     const start = new Date(today)
@@ -265,7 +377,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     for (let i = 0; i < totalDays; i++) {
       const currentDate = new Date(start)
       currentDate.setDate(start.getDate() + i)
-      const dateStr = currentDate.toISOString().split('T')[0]
+      const dateStr = getJakartaDateString(currentDate)
       
       const log = logs.find(l => l.date === dateStr)
       let count = 0
@@ -505,6 +617,46 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span className="text-[10px] text-slate-450 dark:text-slate-500 font-medium">Rekor Terbaik: {stats.longestStreak} Hari</span>
           </div>
 
+          {/* Doa Hari Ini Card */}
+          {(() => {
+            const todayStr = getJakartaDateString()
+            const [, , day] = todayStr.split('-').map(Number)
+            const todayDoa = SHORT_DOAS[day % SHORT_DOAS.length]
+            if (!todayDoa) return null
+            return (
+              <div className="glass-panel rounded-3xl p-5 relative overflow-hidden border border-emerald-100/40 dark:border-amber-500/20 bg-gradient-to-tr from-emerald-50/20 to-teal-50/10 dark:from-amber-950/10 dark:to-slate-900/40 shadow-md">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 dark:bg-amber-500/5 rounded-full blur-2xl -z-10" />
+                <div className="flex items-center gap-2 border-b border-slate-200/50 dark:border-slate-800 pb-2 mb-3">
+                  <BookOpen className="w-4 h-4 text-emerald-600 dark:text-amber-400" />
+                  <span className="text-[10px] text-emerald-600 dark:text-amber-400 font-extrabold uppercase tracking-widest">
+                    Doa Hari Ini
+                  </span>
+                </div>
+                <div className="space-y-3">
+                  {/* Arab Text */}
+                  <p className="text-right font-serif text-slate-900 dark:text-white text-lg sm:text-xl font-bold leading-loose select-all">
+                    {todayDoa.arabic}
+                  </p>
+                  {/* Latin Text */}
+                  <p className="text-xs text-emerald-700 dark:text-amber-400 italic pl-2.5 border-l-2 border-emerald-500 dark:border-amber-500 font-medium select-all">
+                    {todayDoa.latin}
+                  </p>
+                  {/* Translation */}
+                  <div className="space-y-0.5 select-all">
+                    <p className="text-slate-650 dark:text-slate-350 text-[11px] leading-relaxed">
+                      "{todayDoa.translation}"
+                    </p>
+                    {todayDoa.source && (
+                      <p className="text-[9px] text-slate-450 dark:text-slate-500 font-semibold mt-0.5">
+                        &mdash; {todayDoa.source}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Daily Tracker Checklist */}
           <section className="glass-panel rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden transition-colors duration-300">
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 dark:bg-brand-500/5 rounded-full blur-2xl -z-10" />
@@ -523,7 +675,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  max={new Date().toISOString().split('T')[0]}
+                  max={getJakartaDateString()}
                   className="bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-[11px] text-slate-700 dark:text-slate-300 rounded-lg px-2.5 py-1 focus:border-emerald-500 dark:focus:border-brand-500 outline-none cursor-pointer shadow-sm"
                 />
               </div>
@@ -705,6 +857,58 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 ))}
               </div>
+            </div>
+          </section>
+
+          {/* Breakdown Konsistensi Sholat Panel */}
+          <section className="glass-panel rounded-3xl p-6 sm:p-8 space-y-6 transition-colors duration-300">
+            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
+              <CheckSquare className="w-4 h-4 text-emerald-600 dark:text-brand-400" />
+              <h3 className="font-bold text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
+                Breakdown Konsistensi Sholat
+              </h3>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+              {(['subuh', 'dzuhur', 'ashar', 'maghrib', 'isya'] as const).map((key) => {
+                const percentage = stats.prayerConsistency[key] || 0
+                const label = key.charAt(0).toUpperCase() + key.slice(1)
+                
+                const sholatIcons: Record<string, React.ReactNode> = {
+                  subuh: <Cloud className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />,
+                  dzuhur: <Sun className="w-3.5 h-3.5 text-amber-500" />,
+                  ashar: <Sun className="w-3.5 h-3.5 text-orange-400 dark:text-orange-500" />,
+                  maghrib: <Moon className="w-3.5 h-3.5 text-indigo-400 dark:text-indigo-500" />,
+                  isya: <Moon className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                }
+                
+                return (
+                  <div 
+                    key={key} 
+                    className="bg-white/50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-md"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          {sholatIcons[key]}
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-250">{label}</span>
+                        </div>
+                        <span className="text-xs font-extrabold text-emerald-600 dark:text-brand-400">{percentage}%</span>
+                      </div>
+                      <p className="text-[9px] text-slate-450 dark:text-slate-500 mt-0.5">Konsistensi</p>
+                    </div>
+
+                    <div className="mt-4 space-y-1">
+                      <div className="w-full h-2 bg-slate-200 dark:bg-slate-950 rounded-full overflow-hidden relative border border-slate-250/20 dark:border-slate-850/40">
+                        <div 
+                          className="h-full bg-gradient-to-r from-emerald-600 to-emerald-400 dark:from-amber-600 dark:to-amber-400 rounded-full transition-all duration-500"
+                          style={{ width: `${percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </section>
 

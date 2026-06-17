@@ -104,11 +104,11 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden relative shadow-2xl transition-colors duration-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-100/80 dark:bg-slate-950/80 backdrop-blur-md animate-fade-in transition-colors duration-300">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl overflow-hidden relative shadow-xl dark:shadow-2xl transition-colors duration-300">
         
         {/* Glow Effects */}
-        <div className="absolute top-0 left-1/4 w-1/2 h-1/2 bg-emerald-500/10 rounded-full blur-3xl -z-10" />
+        <div className="absolute top-0 left-1/4 w-1/2 h-1/2 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-full blur-3xl -z-10" />
         <div className="absolute bottom-0 right-1/4 w-1/2 h-1/2 bg-emerald-500/5 rounded-full blur-3xl -z-10" />
 
         <div className="p-8">
@@ -117,16 +117,16 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-emerald-500/15 mx-auto mb-4">
               <Compass className="w-6 h-6 text-slate-950" />
             </div>
-            <h2 className="text-2xl font-bold text-white tracking-tight mb-2">
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight mb-2">
               Rakaat Worship Tracker
             </h2>
-            <p className="text-slate-400 text-xs leading-relaxed">
+            <p className="text-slate-600 dark:text-slate-400 text-xs leading-relaxed">
               Jurnal pelacak ibadah privat untuk membangun konsistensi sholat Anda secara digital dan aman.
             </p>
           </div>
 
           {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-950/80 border border-slate-800 rounded-2xl mb-6">
+          <div className="grid grid-cols-2 gap-2 p-1.5 bg-slate-100 dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-2xl mb-6">
             <button
               type="button"
               onClick={() => {
@@ -135,8 +135,8 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
               }}
               className={`py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
                 activeMode === 'magic-link'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/15'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-emerald-500 text-slate-955 shadow-md shadow-emerald-500/15'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <KeyRound className="w-3.5 h-3.5" />
@@ -150,8 +150,8 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
               }}
               className={`py-2.5 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
                 activeMode === 'pin'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/15'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-emerald-500 text-slate-955 shadow-md shadow-emerald-500/15'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -161,11 +161,11 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
 
           {/* Info Banner when Supabase is missing */}
           {!isSupabaseConfigured && (
-            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-xs flex gap-3">
-              <Info className="w-4 h-4 shrink-0 text-amber-400" />
+            <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-800 dark:text-amber-200 text-xs flex gap-3">
+              <Info className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
               <div>
                 <span className="font-semibold block mb-0.5">Setup Supabase Diperlukan</span>
-                Silakan isi berkas <code className="bg-slate-950 px-1 py-0.5 rounded text-amber-300">.env</code> Anda di lokal dengan kunci API Supabase untuk mengaktifkan database dan otentikasi.
+                Silakan isi berkas <code className="bg-slate-200 dark:bg-slate-950 px-1 py-0.5 rounded text-amber-700 dark:text-amber-300">.env</code> Anda di lokal dengan kunci API Supabase untuk mengaktifkan database dan otentikasi.
               </div>
             </div>
           )}
@@ -175,8 +175,8 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
             <div
               className={`mb-6 p-4 rounded-xl text-xs border ${
                 message.type === 'success'
-                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-                  : 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                  ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-800 dark:text-emerald-300'
+                  : 'bg-rose-500/10 border-rose-500/20 text-rose-800 dark:text-rose-300'
               }`}
             >
               {message.text}
@@ -187,18 +187,18 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
           {activeMode === 'magic-link' ? (
             <form onSubmit={handleMagicLinkLogin} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
+                <label htmlFor="email" className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
                   Alamat Email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                   <input
                     type="email"
                     id="email"
                     placeholder="nama@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-950/40 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-white placeholder-slate-600 text-sm outline-none transition-all"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 text-sm outline-none transition-all"
                     required
                     disabled={loading}
                   />
@@ -227,18 +227,18 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
           ) : (
             <form onSubmit={handlePinLogin} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
+                <label htmlFor="email" className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
                   Alamat Email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                   <input
                     type="email"
                     id="email"
                     placeholder="nama@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-950/40 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-white placeholder-slate-600 text-sm outline-none transition-all"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 text-sm outline-none transition-all"
                     required
                     disabled={loading}
                   />
@@ -246,11 +246,11 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
               </div>
 
               <div>
-                <label htmlFor="pin" className="block text-[10px] font-semibold text-slate-400 uppercase tracking-widest mb-2">
+                <label htmlFor="pin" className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-2">
                   PIN Keamanan (6 Digit Angka)
                 </label>
                 <div className="relative">
-                  <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <ShieldCheck className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
                   <input
                     type="password"
                     id="pin"
@@ -260,7 +260,7 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
                     pattern="[0-9]*"
                     inputMode="numeric"
                     maxLength={6}
-                    className="w-full pl-11 pr-4 py-3 bg-slate-950/40 border border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-white placeholder-slate-600 text-sm tracking-widest outline-none transition-all"
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 rounded-xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 text-sm tracking-widest outline-none transition-all"
                     required
                     disabled={loading}
                   />
@@ -270,10 +270,10 @@ export const Auth: React.FC<AuthProps> = ({ showToast }) => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-950 font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 active:scale-[0.98] cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-slate-955 font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/10 active:scale-[0.98] cursor-pointer"
               >
                 {loading ? (
-                  <span className="w-5 h-5 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
+                  <span className="w-5 h-5 rounded-full border-2 border-slate-955 border-t-transparent animate-spin" />
                 ) : (
                   <>
                     <span>Masuk dengan PIN</span>

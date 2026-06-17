@@ -21,6 +21,19 @@ export const getEmptyLog = (date: string): PrayerLog => ({
   isya: false,
 })
 
+/**
+ * Helper to get date string formatted YYYY-MM-DD in Asia/Jakarta (GMT+7) timezone
+ */
+export const getJakartaDateString = (d: Date = new Date()): string => {
+  const formatter = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  return formatter.format(d);
+}
+
 export const prayerService = {
   /**
    * Fetch logs for a user (or local storage if guest)
@@ -33,7 +46,7 @@ export const prayerService = {
         try {
           return JSON.parse(localData) as PrayerLog[]
         } catch (e) {
-          console.error('Failed to parse local prayer logs', e)
+          console.error('Failed to parse local prayer logs:', e)
           return []
         }
       }
@@ -43,49 +56,49 @@ export const prayerService = {
     try {
       const { data, error } = await supabase
         .from('prayer_logs')
-        .select('date, subuh, dzuhur, ashar, maghrib, isya')
+        .select('*')
         .eq('user_id', userId)
         .order('date', { ascending: true })
 
       if (error) throw error
       return (data || []) as PrayerLog[]
-    } catch (error) {
-      console.error('Error fetching logs from Supabase, falling back to LocalStorage:', error)
-      // Fallback to local storage if DB query fails
+    } catch (e) {
+      console.error('Error fetching logs from Supabase:', e)
+      // Fallback to local storage if supabase fails
       const localData = localStorage.getItem(LOCAL_STORAGE_KEY)
-      return localData ? JSON.parse(localData) : []
+      return localData ? JSON.parse(localData) as PrayerLog[] : []
     }
   },
 
   /**
-   * Toggle a prayer status for a specific date
+   * Check or uncheck a prayer log
    */
   async togglePrayer(
     userId: string | null,
     date: string,
     prayer: 'subuh' | 'dzuhur' | 'ashar' | 'maghrib' | 'isya'
   ): Promise<PrayerLog[]> {
-    // 1. Fetch current logs first
     const logs = await this.getLogs(userId)
-    const existingIndex = logs.findIndex((l) => l.date === date)
-    
+    const existingLogIndex = logs.findIndex((l) => l.date === date)
+
     let updatedLog: PrayerLog
-    if (existingIndex > -1) {
+    if (existingLogIndex >= 0) {
       updatedLog = {
-        ...logs[existingIndex],
-        [prayer]: !logs[existingIndex][prayer],
+        ...logs[existingLogIndex],
+        [prayer]: !logs[existingLogIndex][prayer],
       }
     } else {
-      updatedLog = getEmptyLog(date)
-      updatedLog[prayer] = true
+      updatedLog = {
+        ...getEmptyLog(date),
+        [prayer]: true,
+      }
     }
 
     const newLogs = [...logs]
-    if (existingIndex > -1) {
-      newLogs[existingIndex] = updatedLog
+    if (existingLogIndex >= 0) {
+      newLogs[existingLogIndex] = updatedLog
     } else {
       newLogs.push(updatedLog)
-      newLogs.sort((a, b) => a.date.localeCompare(b.date))
     }
 
     // 2. Persist to LocalStorage (always save locally as a backup/offline cache)
@@ -196,6 +209,13 @@ export const prayerService = {
         totalChecked: 0,
         totalEligible: 0,
         comparisonGrowth: 0,
+        prayerConsistency: {
+          subuh: 0,
+          dzuhur: 0,
+          ashar: 0,
+          maghrib: 0,
+          isya: 0,
+        }
       }
     }
 
@@ -210,9 +230,9 @@ export const prayerService = {
     let currentStreak = 0
     let longestStreak = 0
 
-    // Get today and yesterday dates in local time zone
+    // Get today and yesterday dates in Jakarta time zone (GMT+7)
     const now = new Date()
-    const formatDateStr = (d: Date) => d.toISOString().split('T')[0]
+    const formatDateStr = (d: Date) => getJakartaDateString(d)
 
     // Build map for quick access
     const completedDatesMap = new Set<string>()
@@ -223,11 +243,9 @@ export const prayerService = {
     })
 
     // Calculate streaks by counting backward from today or yesterday
-    // If today is completed, streak starts today. Otherwise, if yesterday is completed, streak starts yesterday.
     const checkDate = new Date(now)
     let checkDateStr = formatDateStr(checkDate)
 
-    // If today is not completed, we check yesterday.
     if (!completedDatesMap.has(checkDateStr)) {
       checkDate.setDate(checkDate.getDate() - 1)
       checkDateStr = formatDateStr(checkDate)
@@ -240,7 +258,6 @@ export const prayerService = {
     }
 
     // Longest streak calculation across all logs
-    // We sort all dates and find consecutive ranges
     const activeDates = Array.from(completedDatesMap).sort()
     if (activeDates.length > 0) {
       let currentSeq = 1
@@ -265,14 +282,14 @@ export const prayerService = {
       }
     }
 
-    // Monthly completion calculations
-    const currentMonth = now.getMonth() // 0-11
-    const currentYear = now.getFullYear()
-    
+    // Monthly completion calculations in Jakarta time zone
+    const jakartaTodayStr = getJakartaDateString(now)
+    const [currentYear, currentMonth, currentDay] = jakartaTodayStr.split('-').map(Number)
+
     // Get total logged prayers in the current month
     const thisMonthLogs = sortedLogs.filter((log) => {
-      const logDate = new Date(log.date)
-      return logDate.getMonth() === currentMonth && logDate.getFullYear() === currentYear
+      const [y, m] = log.date.split('-').map(Number)
+      return m === currentMonth && y === currentYear
     })
 
     let totalChecked = 0
@@ -284,22 +301,21 @@ export const prayerService = {
       if (log.isya) totalChecked++
     })
 
-    // Total possible prayers in this month so far: days in month elapsed * 5
-    // But let's check: if we started tracking, count days from first log in this month or from start of month
-    // To keep it simple and fair, total eligible = days elapsed in current month * 5
-    const daysElapsed = now.getDate()
+    const daysElapsed = currentDay
     const totalEligible = daysElapsed * 5
     const monthlyCompletionRate = totalEligible > 0 ? Math.round((totalChecked / totalEligible) * 100) : 0
 
     // Comparison Growth: Compare current month rate vs last month rate
-    const lastMonthDate = new Date(now)
-    lastMonthDate.setMonth(lastMonthDate.getMonth() - 1)
-    const lastMonth = lastMonthDate.getMonth()
-    const lastMonthYear = lastMonthDate.getFullYear()
+    let lastMonth = currentMonth - 1 - 1 // convert 1-12 to 0-11 index, then -1 for last month
+    let lastMonthYear = currentYear
+    if (lastMonth < 0) {
+      lastMonth = 11
+      lastMonthYear--
+    }
 
     const lastMonthLogs = sortedLogs.filter((log) => {
-      const logDate = new Date(log.date)
-      return logDate.getMonth() === lastMonth && logDate.getFullYear() === lastMonthYear
+      const [y, m] = log.date.split('-').map(Number)
+      return (m - 1) === lastMonth && y === lastMonthYear
     })
 
     let lastMonthChecked = 0
@@ -318,6 +334,30 @@ export const prayerService = {
 
     const comparisonGrowth = monthlyCompletionRate - lastMonthCompletionRate
 
+    // Calculate consistency per prayer over all logs
+    const totalDays = logs.length
+    let subuhCount = 0
+    let dzuhurCount = 0
+    let asharCount = 0
+    let maghribCount = 0
+    let isyaCount = 0
+
+    logs.forEach((log) => {
+      if (log.subuh) subuhCount++
+      if (log.dzuhur) dzuhurCount++
+      if (log.ashar) asharCount++
+      if (log.maghrib) maghribCount++
+      if (log.isya) isyaCount++
+    })
+
+    const prayerConsistency = {
+      subuh: totalDays > 0 ? Math.round((subuhCount / totalDays) * 100) : 0,
+      dzuhur: totalDays > 0 ? Math.round((dzuhurCount / totalDays) * 100) : 0,
+      ashar: totalDays > 0 ? Math.round((asharCount / totalDays) * 100) : 0,
+      maghrib: totalDays > 0 ? Math.round((maghribCount / totalDays) * 100) : 0,
+      isya: totalDays > 0 ? Math.round((isyaCount / totalDays) * 100) : 0,
+    }
+
     return {
       currentStreak,
       longestStreak,
@@ -325,6 +365,7 @@ export const prayerService = {
       totalChecked,
       totalEligible,
       comparisonGrowth,
+      prayerConsistency,
     }
   }
 }

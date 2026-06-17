@@ -126,50 +126,63 @@ function App() {
     setThemeMode(mode)
   }
 
-  // Load logs helper
-  const loadLogsForUser = async (userId: string) => {
-    const data = await prayerService.getLogs(userId)
-    setLogs(data)
-  }
 
   useEffect(() => {
+    let active = true
+    let subscription: any = null
+
     const initializeAuth = async () => {
       if (isSupabaseConfigured && supabase) {
         try {
           const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            setUser(session.user)
-            await loadLogsForUser(session.user.id)
+          if (active) {
+            if (session) {
+              setUser(session.user)
+              const data = await prayerService.getLogs(session.user.id)
+              if (active) setLogs(data)
+            }
           }
         } catch (error) {
           console.error('Error getting Supabase session:', error)
         } finally {
-          setLoading(false)
-        }
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-          if (session) {
-            setUser(session.user)
-            setLoading(true)
-            await loadLogsForUser(session.user.id)
-            setLoading(false)
-          } else {
-            setUser(null)
-            setLogs([])
-          }
-        })
-
-        return () => {
-          subscription.unsubscribe()
+          if (active) setLoading(false)
         }
       } else {
         // Not configured
-        setLoading(false)
+        if (active) setLoading(false)
       }
     }
 
     initializeAuth()
+
+    if (isSupabaseConfigured && supabase) {
+      const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        if (session) {
+          if (active) {
+            setUser(session.user)
+            setLoading(true)
+            const data = await prayerService.getLogs(session.user.id)
+            if (active) {
+              setLogs(data)
+              setLoading(false)
+            }
+          }
+        } else {
+          if (active) {
+            setUser(null)
+            setLogs([])
+          }
+        }
+      })
+      subscription = sub
+    }
+
+    return () => {
+      active = false
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [])
 
   const handleTogglePrayer = async (date: string, prayer: 'subuh' | 'dzuhur' | 'ashar' | 'maghrib' | 'isya') => {
