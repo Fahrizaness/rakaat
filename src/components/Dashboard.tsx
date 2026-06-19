@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import type { PrayerLog } from '../services/prayerService'
 import { getJakartaDateString } from '../services/prayerService'
+import { fetchPrayerTimings, getNextPrayer, formatRemainingTime } from '../services/prayerTimeService'
 import { 
   Flame, 
   TrendingUp, 
@@ -24,7 +25,8 @@ import {
   Monitor,
   ShieldCheck,
   Download,
-  X
+  X,
+  RotateCw
 } from 'lucide-react'
 
 interface DashboardProps {
@@ -251,6 +253,97 @@ export const Dashboard: React.FC<DashboardProps> = ({
   })
   
   const [activeTab, setActiveTab] = useState<'tracker' | 'stats' | 'doa' | 'settings'>('tracker')
+  
+  // Prayer Times states
+  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(() => {
+    const saved = localStorage.getItem('rakaat_user_location')
+    return saved ? JSON.parse(saved) : null
+  })
+  const [prayerData, setPrayerData] = useState<any>(null)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState<string | null>(null)
+  const [nextPrayer, setNextPrayer] = useState<any>(null)
+  const [countdownStr, setCountdownStr] = useState<string>('')
+  const [showAllTimings, setShowAllTimings] = useState(false)
+
+  const detectLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation tidak didukung.')
+      setLocation({ lat: -6.2088, lng: 106.8456 }) // fallback JKT
+      return
+    }
+
+    setLocationLoading(true)
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const newLoc = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude
+        }
+        localStorage.setItem('rakaat_user_location', JSON.stringify(newLoc))
+        setLocation(newLoc)
+        setLocationError(null)
+      },
+      (error) => {
+        console.warn('Geolocation error:', error)
+        setLocationError('Akses lokasi ditolak.')
+        const fallbackLoc = { lat: -6.2088, lng: 106.8456 }
+        localStorage.setItem('rakaat_user_location', JSON.stringify(fallbackLoc))
+        setLocation(fallbackLoc)
+      }
+    )
+  }
+
+  // Load timings on location change
+  useEffect(() => {
+    const loadTimings = async (lat: number, lng: number) => {
+      setLocationLoading(true)
+      try {
+        const data = await fetchPrayerTimings(lat, lng)
+        setPrayerData(data)
+      } catch (err: any) {
+        console.error('Error fetching prayer timings:', err)
+        setLocationError('Gagal memuat jadwal sholat.')
+        // Fallback to Jakarta
+        try {
+          const fallbackData = await fetchPrayerTimings(-6.2088, 106.8456)
+          setPrayerData(fallbackData)
+        } catch (e) {
+          console.error('Fallback failed too:', e)
+        }
+      } finally {
+        setLocationLoading(false)
+      }
+    }
+
+    if (location) {
+      loadTimings(location.lat, location.lng)
+    } else {
+      const timer = setTimeout(() => {
+        detectLocation()
+      }, 0)
+      return () => clearTimeout(timer)
+    }
+  }, [location])
+
+  // Countdown timer interval
+  useEffect(() => {
+    if (!prayerData) return
+
+    const updateTimer = () => {
+      try {
+        const next = getNextPrayer(prayerData.timings, prayerData.timezone)
+        setNextPrayer(next)
+        setCountdownStr(formatRemainingTime(next.remainingSeconds))
+      } catch (err) {
+        console.error('Error calculating countdown:', err)
+      }
+    }
+
+    updateTimer()
+    const interval = setInterval(updateTimer, 1000)
+    return () => clearInterval(interval)
+  }, [prayerData])
   const [doaSearch, setDoaSearch] = useState<string>('')
   const [expandedDoaId, setExpandedDoaId] = useState<string | null>(null)
 
@@ -575,17 +668,116 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
           )}
 
-          {/* Welcome Greeting Header */}
-          <div className="space-y-1 mt-2 mb-1 pl-1">
-            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-none block">
-              {getGreetingTime()}
-            </span>
-            <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
-              {user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Pengguna Rakaat'}
-            </h2>
-            <p className="text-[11px] sm:text-xs text-emerald-600 dark:text-brand-400 italic font-medium leading-relaxed max-w-md mt-1.5 opacity-90">
-              &ldquo;{getDailyQuote()}&rdquo;
-            </p>
+          {/* Top Header Panel (Greeting + Prayer Widget) */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mt-2 mb-1 pl-1">
+            {/* Welcome Greeting Header */}
+            <div className="space-y-1">
+              <span className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-none block">
+                {getGreetingTime()}
+              </span>
+              <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white leading-tight">
+                {user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'Pengguna Rakaat'}
+              </h2>
+              <p className="text-[11px] sm:text-xs text-emerald-600 dark:text-brand-400 italic font-medium leading-relaxed max-w-md mt-1.5 opacity-90">
+                &ldquo;{getDailyQuote()}&rdquo;
+              </p>
+            </div>
+
+            {/* Prayer Time & Countdown Widget */}
+            <div className="glass-panel rounded-3xl p-4 sm:p-5 flex-1 md:max-w-md w-full relative overflow-hidden border border-emerald-100/40 dark:border-amber-500/10 bg-gradient-to-tr from-white to-slate-50/50 dark:from-[#1e293b]/40 dark:to-[#0f172a]/30 shadow-md">
+              <div className="flex items-center justify-between gap-4">
+                <div className="space-y-1">
+                  {/* Hijri Date */}
+                  {prayerData && (
+                    <span className="text-[9px] font-bold text-slate-500 dark:text-brand-400/80 uppercase tracking-widest block">
+                      {prayerData.hijri.day} {prayerData.hijri.monthEn} {prayerData.hijri.year} H
+                    </span>
+                  )}
+                  {nextPrayer ? (
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                        {nextPrayer.name}
+                      </span>
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-brand-400">
+                        {nextPrayer.timeStr}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-slate-400 dark:text-slate-500">Mendeteksi lokasi...</span>
+                  )}
+                </div>
+
+                {/* Countdown display */}
+                {nextPrayer && (
+                  <div className="text-right">
+                    <span className="text-[9px] text-slate-400 dark:text-slate-500 uppercase tracking-wider block font-semibold">
+                      Sisa Waktu
+                    </span>
+                    <span className="text-base sm:text-lg font-extrabold tracking-wider font-mono text-slate-900 dark:text-white animate-pulse-subtle">
+                      {countdownStr}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-between border-t border-slate-200/50 dark:border-slate-800/60 mt-3 pt-3.5">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={detectLocation}
+                    disabled={locationLoading}
+                    className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/50 dark:border-slate-700 text-slate-500 dark:text-slate-300 transition-all cursor-pointer active:scale-90"
+                    title="Deteksi ulang lokasi"
+                  >
+                    <RotateCw className={`w-3 h-3 ${locationLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                  {locationError ? (
+                    <span className="text-[9px] font-bold text-amber-600 dark:text-amber-500/85 font-semibold">
+                      Fallback: JKT
+                    </span>
+                  ) : (
+                    <span className="text-[9px] text-slate-450 dark:text-slate-500 font-semibold truncate max-w-[120px]">
+                      {prayerData ? `Zone: ${prayerData.timezone.split('/').pop()?.replace('_', ' ')}` : 'Lokasi aktif'}
+                    </span>
+                  )}
+                </div>
+
+                {prayerData && (
+                  <button
+                    onClick={() => setShowAllTimings(!showAllTimings)}
+                    className="text-[10px] font-bold text-emerald-600 dark:text-brand-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>{showAllTimings ? 'Tutup Jadwal' : 'Lihat Jadwal'}</span>
+                    {showAllTimings ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                )}
+              </div>
+
+              {/* Collapsible Full Timings Grid */}
+              {showAllTimings && prayerData && (
+                <div className="border-t border-slate-200/50 dark:border-slate-800/60 mt-3 pt-3 grid grid-cols-3 gap-2 sm:grid-cols-6 animate-scale-in text-center">
+                  {(['subuh', 'syuruq', 'dzuhur', 'ashar', 'maghrib', 'isya'] as const).map((key) => {
+                    const time = prayerData.timings[key]
+                    const label = key === 'subuh' ? 'Subuh' : key === 'syuruq' ? 'Syuruq' : key === 'dzuhur' ? 'Dzuhur' : key === 'ashar' ? 'Ashar' : key === 'maghrib' ? 'Maghrib' : 'Isya'
+                    const isNext = nextPrayer?.key === key
+
+                    return (
+                      <div 
+                        key={key} 
+                        className={`p-1.5 rounded-xl border transition-colors ${
+                          isNext 
+                            ? 'bg-emerald-500/10 dark:bg-brand-500/10 border-emerald-500/25 dark:border-brand-500/20 text-emerald-800 dark:text-brand-350' 
+                            : 'bg-slate-50/50 dark:bg-slate-900/40 border-slate-200/40 dark:border-slate-800/40 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        <span className="text-[9px] font-bold block opacity-75">{label}</span>
+                        <span className="text-[10px] font-extrabold block mt-0.5">{time}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Maa Shaa Allah Banner */}
